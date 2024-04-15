@@ -1,0 +1,112 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Aug 15 14:23:30 2023
+
+@author: chanboonkwee
+"""
+import unittest
+from datetime import date
+from epi_week import epi_week
+
+class TestEpi(unittest.TestCase):
+    def setUp(self):
+        self.e = {}
+        self.yr_range = list(range(2021, 2031))
+        for y in self.yr_range:
+            self.e[y] = epi_week(y)
+
+
+    def test_check_month_2022_2025(self):
+        print('')
+        for y, e in self.e.items():
+            last_epi = list(e.epiweek.keys())[-1]
+            print(f"{e.year}: {e.epiweek[last_epi]} ({last_epi})")
+        print('')
+
+        for y in self.yr_range[1:-1]:
+            first_sunday = self.e[y].calculate_first_sunday()
+            last_sunday  = self.e[y].calculate_last_sunday()
+            prev_year_last_sunday  = self.e[y-1].calculate_last_sunday()
+            next_year_first_sunday = self.e[y+1].calculate_first_sunday()
+
+            print(f"{y} first sunday: {first_sunday.strftime('%A %d %b %Y')}")
+            print(f"{y} last sunday : {last_sunday.strftime('%A %d %b %Y')}\n")
+
+            # Some common logic when calculating epi week
+            # Logic 1 : when year n last (sun)day and year n+1 first (sun)day
+            #           falls on the same day, year n+1 first (sun)day is in
+            #           the year n (previous year) and month will be 12
+            #
+            # Logic 2 : when year n last (sun)day and year n+1 first (sun)day
+            #           is NOT on the same day, year n+1 first (sun)day is in
+            #           year n+1 and month will be 1
+
+            if first_sunday == prev_year_last_sunday:
+                self.assertEqual(first_sunday.month, 12)
+                self.assertEqual(first_sunday.year, y-1)
+            else:
+                self.assertEqual(first_sunday.month, 1)
+                self.assertEqual(first_sunday.year, y)
+
+            if last_sunday == next_year_first_sunday:
+                self.assertEqual(last_sunday.month, 12)
+                self.assertEqual(last_sunday.year, y)
+            else:
+                self.assertEqual(last_sunday.month, 12)
+                self.assertEqual(last_sunday.year, y)
+
+        # applies for 2023, may be different for another year
+        for y in self.yr_range:
+            for x in [1, 53]:
+                print (f'Epi Week {x:-2d} {y}: %s'  % self.e[y].get_epi_week_range(x, '%d %b %Y'))
+
+
+    def test_check_others(self):
+        for k, v in {date(2022, 4, 30) : 18,
+                     date(2023, 1, 1)  : 1,
+                     date(2023, 4, 23) : 17,
+                     date(2023, 4, 29) : 17,
+                     date(2023, 4, 30) : 18}.items():
+            self.assertEqual(self.e[2023].get_epi_number(k), v)
+
+        self.assertNotEqual(self.e[2023].get_epi_number(date(2025, 4, 30)), 0)
+
+
+    def test_eq_dt_epi_num(self):
+        # get the number of epidemiological weeks in 2021 to 2026
+        for y, e in self.e.items():
+            epi_week_count = len(e.epiweek)
+            self.assertEqual(e.calculate_first_sunday(),
+                             e.get_week_start(1))
+            self.assertEqual(e.calculate_last_sunday(),
+                             e.get_week_start(epi_week_count))
+
+
+
+    def test_wrong_input_type(self):
+        self.assertRaises(ValueError, self.e[2023].get_epi_number, "Wrong Type")
+
+
+    def test_daterange(self):
+        # epidemiological week number starts with 1, so 0 will return ''
+        # 1 year will have only 52-53 weeks, so 54 will return ''
+        self.assertEqual(self.e[2023].get_epi_week_range(0),  '')
+        self.assertEqual(self.e[2023].get_epi_week_range(54), '')
+        self.assertEqual(self.e[2024].get_epi_week_range(0),  '')
+        self.assertEqual(self.e[2024].get_epi_week_range(54), '')
+
+
+    def test_string_format(self):
+        self.assertEqual(self.e[2023].get_epi_week_range(1),  '01-Jan to 07-Jan')
+        self.assertEqual(self.e[2023].get_epi_week_range(17), '23-Apr to 29-Apr')
+        self.assertEqual(self.e[2023].get_epi_week_range(1,  '%d %b %Y'), '01 Jan 2023 to 07 Jan 2023')
+        self.assertEqual(self.e[2023].get_epi_week_range(17, '%d %b %Y'), '23 Apr 2023 to 29 Apr 2023')
+
+
+    def test_start_date(self):
+        self.assertEqual(self.e[2023].get_week_start(17), date(2023, 4, 23))
+        self.assertEqual(self.e[2023].get_week_end(17), date(2023, 4, 29))
+
+
+if __name__=='__main__':
+    unittest.main()
